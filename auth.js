@@ -10,8 +10,8 @@ function setupOIDC() {
       {
         issuer: process.env.ISSUER,
         authorizationURL: `${process.env.ISSUER}/oauth2//v1/authorize`,
-        tokenURL: `${process.env.ISSUER}/oauth2//v1/token`,
-        userInfoURL: `${process.env.ISSUER}/oauth2//v1/userinfo`,
+        tokenURL: `${process.env.ISSUER}/oauth2/v1/token`,
+        userInfoURL: `${process.env.ISSUER}/oauth2/v1/userinfo`,
         clientID: process.env.CLIENT_ID,
         clientSecret: process.env.CLIENT_SECRET,
         callbackURL: process.env.CALLBACK_URL,
@@ -22,7 +22,7 @@ function setupOIDC() {
         profile.idToken = idToken;
         profile.refreshToken = refreshToken;
 
-        console.log("Profile Object -->", profile)
+        console.dir(profile, { depth: null });
 
         return done(null, { profile });
       }
