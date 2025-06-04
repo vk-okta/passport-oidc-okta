@@ -27,8 +27,13 @@ router.get('/profile', ensureAuthenticated, (req, res) => {
 });
 
 router.get('/logout', (req, res) => {
+  const id_token_hint = req.user?.profile.idToken
+  
   req.logout(() => {
-    res.redirect('/');
+    req.session.destroy(() => {
+      const logoutUrl = `https://vivek-giri.oktapreview.com/oauth2/ausae177jfbCM7LBp1d7/v1/logout?id_token_hint=${id_token_hint}&post_logout_redirect_uri=http://localhost:8080`;
+      res.redirect(logoutUrl);
+    });
   });
 });
 

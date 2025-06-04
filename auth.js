@@ -19,13 +19,11 @@ function setupOIDC() {
         scope: 'openid profile email offline_access',
       },
       function (issuer, profile, context, idToken, accessToken, refreshToken, done) {
-        console.log('idToken', idToken);
-        console.log('accessToken', accessToken);
-        console.log('refreshToken', refreshToken);
-
         profile.accessToken = accessToken;
         profile.idToken = idToken;
-        profile.refreshToken = profile.refreshToken;
+        profile.refreshToken = refreshToken;
+
+        // console.log("Profile Object -->", profile)
 
         return done(null, { profile });
       }
