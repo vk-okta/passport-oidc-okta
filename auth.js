@@ -1,21 +1,20 @@
 import passport from 'passport';
 import { Strategy as OIDCStrategy } from 'passport-openidconnect';
+import 'dotenv/config'
 
 function setupOIDC() {
-  const clientId = '0oaa48i18zglra7K41d7';
-  const clientSecret = 'y2lgSLa-zd8LTAiSPdKh4idxY32Gv7B20UDyV_WCVopWvYR87ZdXtpytZ0f3xm6q';
 
   passport.use(
     'oidc',
     new OIDCStrategy(
       {
-        issuer: 'https://vivek-giri.oktapreview.com/oauth2/ausae177jfbCM7LBp1d7',
-        authorizationURL: 'https://vivek-giri.oktapreview.com/oauth2/ausae177jfbCM7LBp1d7/v1/authorize',
-        tokenURL: 'https://vivek-giri.oktapreview.com/oauth2/ausae177jfbCM7LBp1d7/v1/token',
-        userInfoURL: 'https://vivek-giri.oktapreview.com/oauth2/ausae177jfbCM7LBp1d7/v1/userinfo',
-        clientID: clientId,
-        clientSecret: clientSecret,
-        callbackURL: 'http://localhost:8080/authorization-code/callback',
+        issuer: process.env.ISSUER,
+        authorizationURL: `${process.env.ISSUER}/v1/authorize`,
+        tokenURL: `${process.env.ISSUER}/v1/token`,
+        userInfoURL: `${process.env.ISSUER}/v1/userinfo`,
+        clientID: process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        callbackURL: process.env.CALLBACK_URL,
         scope: 'openid profile email offline_access',
       },
       function (issuer, profile, context, idToken, accessToken, refreshToken, done) {
@@ -23,7 +22,7 @@ function setupOIDC() {
         profile.idToken = idToken;
         profile.refreshToken = refreshToken;
 
-        // console.log("Profile Object -->", profile)
+        console.log("Profile Object -->", profile)
 
         return done(null, { profile });
       }
