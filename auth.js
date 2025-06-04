@@ -1,5 +1,6 @@
 import passport from 'passport';
 import { Strategy as OIDCStrategy } from 'passport-openidconnect';
+import jwt from 'jsonwebtoken';
 import 'dotenv/config'
 
 function setupOIDC() {
@@ -21,6 +22,10 @@ function setupOIDC() {
         profile.accessToken = accessToken;
         profile.idToken = idToken;
         profile.refreshToken = refreshToken;
+
+        const decoded = jwt.decode(idToken)
+        // adding groups from ID Token in profile object
+        profile.userGroups = decoded.groups
 
         console.dir(profile, { depth: null });
 
