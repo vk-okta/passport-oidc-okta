@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title><%= group.label %> Group</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f6f9;
+        margin: 0;
+        padding: 0;
+        color: #333;
+      }
+
+      header {
+        background-color: #2c3e50;
+        color: #fff;
+        padding: 20px 40px;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      nav {
+        margin-top: 8px;
+      }
+
+      nav a {
+        color: #ecf0f1;
+        text-decoration: none;
+        margin-right: 15px;
+        font-size: 14px;
+      }
+
+      nav a:hover {
+        text-decoration: underline;
+      }
+
+      main {
+        padding: 40px;
+      }
+
+      h2 {
+        font-size: 22px;
+        color: #2c3e50;
+      }
+
+      p {
+        font-size: 16px;
+        margin: 10px 0;
+      }
+
+      .back-link {
+        display: inline-block;
+        margin-top: 30px;
+        color: #007bff;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      .back-link:hover {
+        text-decoration: underline;
+      }
+
+      footer {
+        padding: 20px 40px;
+        background-color: #ecf0f1;
+        color: #666;
+        text-align: center;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1><%= group.label %> Group</h1>
+      <nav>
+        <a href="/profile">Back to Profile</a>
+        <a href="/logout" class="logout-link">Logout</a>
+      </nav>
+    </header>
+
+    <main>
+      <h2>Group Information</h2>
+      <p><strong>Group Name:</strong> <%= group.label %></p>
+      <p><strong>Group ID:</strong> <%= group.id %></p>
+    </main>
+  </body>
+</html>
