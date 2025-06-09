@@ -111,9 +111,9 @@
       <section class="section">
         <h2>Your Groups</h2>
         <div class="group-list">
-          <% user.userGroups.forEach(function(group) { %>
+          <% if (user.userGroups) { user.userGroups.forEach(function(group) { %>
           <a href="/groups/<%= group.id %>"><%= group.label %></a>
-          <% }); %>
+          <% }); } %>
         </div>
       </section>
     </main>

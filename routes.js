@@ -45,7 +45,10 @@ router.get('/logout', (req, res) => {
 
   req.logout(() => {
     req.session.destroy(() => {
-      const logoutUrl = `${process.env.ISSUER}/oauth2/v1/logout?id_token_hint=${id_token_hint}&post_logout_redirect_uri=${process.env.POST_LOGOUT_URL}`;
+      const logoutUrl = `
+      ${process.env.ISSUER}/oauth2/v1/logout
+      ?id_token_hint=${id_token_hint}
+      &post_logout_redirect_uri=${process.env.POST_LOGOUT_URL}`;
       res.redirect(logoutUrl);
     });
   });

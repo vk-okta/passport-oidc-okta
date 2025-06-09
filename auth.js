@@ -4,14 +4,23 @@ import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 
 function setupOIDC() {
+  const splitArray = process.env.ISSUER.split('/oauth2').filter(Boolean);
+
+  // if splitArray size is greater than 1 -> custom Auth Server was used
+  // org Server -> issuer: https://vivek-giri.oktapreview.com
+  // custom auth server -> issuer: https://vivek-giri.oktapreview.com/oauth2/default
+
+  // For Org Auth Server, remove the /oauth2 just from the issuer URL
+  const issuer = splitArray.length > 1 ? process.env.ISSUER : process.env.ISSUER.split('/oauth2')[0];
+
   passport.use(
     'oidc',
     new OIDCStrategy(
       {
-        issuer: process.env.ISSUER,
-        authorizationURL: `${process.env.ISSUER}/oauth2/v1/authorize`,
-        tokenURL: `${process.env.ISSUER}/oauth2/v1/token`,
-        userInfoURL: `${process.env.ISSUER}/oauth2/v1/userinfo`,
+        issuer: issuer,
+        authorizationURL: `${process.env.ISSUER}/v1/authorize`,
+        tokenURL: `${process.env.ISSUER}/v1/token`,
+        userInfoURL: `${process.env.ISSUER}/v1/userinfo`,
         clientID: process.env.CLIENT_ID,
         clientSecret: process.env.CLIENT_SECRET,
         callbackURL: process.env.CALLBACK_URL,
@@ -26,7 +35,7 @@ function setupOIDC() {
 
         // modifying the Groups array to object to have ids & label
         // ["Groups 1", "Group Admin"] --> [{id: "groups1", label: "Groups1"}, {id: "groupAdmin", label: "Group Admin"}]
-        const modifiedGroups = decoded.groups.map((element) => {
+        const modifiedGroups = decoded?.groups?.map((element) => {
           return {
             label: element,
             id: element.split(' ').join('-').toLowerCase(),
