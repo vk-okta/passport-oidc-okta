@@ -24,25 +24,37 @@ function setupOIDC() {
         clientID: process.env.CLIENT_ID,
         clientSecret: process.env.CLIENT_SECRET,
         callbackURL: process.env.CALLBACK_URL,
-        scope: 'openid profile email offline_access groups',
+        scope: 'openid profile email offline_access',
       },
       function (issuer, profile, context, idToken, accessToken, refreshToken, done) {
         profile.accessToken = accessToken;
         profile.idToken = idToken;
         profile.refreshToken = refreshToken;
 
-        const decoded = jwt.decode(idToken);
+        const decoded = jwt.decode(accessToken);
+        const departmentVal = decoded.employeeDepartment;
 
         // modifying the Groups array to object to have ids & label
         // ["Groups 1", "Group Admin"] --> [{id: "groups1", label: "Groups1"}, {id: "groupAdmin", label: "Group Admin"}]
-        const modifiedGroups = decoded?.groups?.map((element) => {
-          return {
-            label: element,
-            id: element.split(' ').join('-').toLowerCase(),
-          };
-        });
+        // const modifiedGroups = decoded?.groups?.map((element) => {
+        //   return {
+        //     label: element,
+        //     id: element.split(' ').join('-').toLowerCase(),
+        //   };
+        // });
 
-        profile.userGroups = modifiedGroups;
+        // if dept value equals to "d1" change it to [{id: 'd1", label: "d1"}]
+        // if dept value equals to "all" change it to [{id: 'd1", label: "d1"}, {id: 'd2", label: "d2"}, {id: 'd3", label: "d3"}]
+        const modifiedDepartment =
+          departmentVal === 'all'
+            ? [
+                { id: 'd1', label: 'd1' },
+                { id: 'd2', label: 'd2' },
+                { id: 'd3', label: 'd3' },
+              ]
+            : [{ id: departmentVal.split(' ').join('-').toLowerCase(), label: departmentVal }];
+
+        profile.userGroups = modifiedDepartment;
 
         console.dir(profile, { depth: null });
 
