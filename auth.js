@@ -1,74 +1,102 @@
-import passport from 'passport';
-import { Strategy as OIDCStrategy } from 'passport-openidconnect';
-import jwt from 'jsonwebtoken';
+import * as client from 'openid-client';
 import 'dotenv/config';
 
-function setupOIDC() {
-  const splitArray = process.env.ISSUER.split('/oauth2').filter(Boolean);
+export async function getClientConfig() {
+  return await client.discovery(new URL(process.env.ISSUER), process.env.CLIENT_ID, process.env.CLIENT_SECRET);
+}
 
-  // if splitArray size is greater than 1 -> custom Auth Server was used
-  // org Server -> issuer: https://vivek-giri.oktapreview.com
-  // custom auth server -> issuer: https://vivek-giri.oktapreview.com/oauth2/default
+export async function loginHandler(req, res) {
+  try {
+    const openIdClientConfig = await getClientConfig();
 
-  // For Org Auth Server, remove the /oauth2 just from the issuer URL
-  const issuer = splitArray.length > 1 ? process.env.ISSUER : process.env.ISSUER.split('/oauth2')[0];
+    const code_verifier = client.randomPKCECodeVerifier();
+    const code_challenge = await client.calculatePKCECodeChallenge(code_verifier);
 
-  passport.use(
-    'oidc',
-    new OIDCStrategy(
-      {
-        issuer: issuer,
-        authorizationURL: `${process.env.ISSUER}/v1/authorize`,
-        tokenURL: `${process.env.ISSUER}/v1/token`,
-        userInfoURL: `${process.env.ISSUER}/v1/userinfo`,
-        clientID: process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET,
-        callbackURL: process.env.CALLBACK_URL,
-        scope: 'openid profile email offline_access',
+    const state = client.randomState();
+    req.session.pkce = { code_verifier, state };
+    req.session.save();
+
+    const authUrl = client.buildAuthorizationUrl(openIdClientConfig, {
+      scope: 'openid profile email offline_access',
+      state,
+      code_challenge,
+      code_challenge_method: 'S256',
+      redirect_uri: process.env.CALLBACK_URL,
+    });
+
+    res.redirect(authUrl);
+  } catch (error) {
+    res.status(500).send('OIDC client is not configured correctly.');
+  }
+}
+
+export async function callbackHandler(req, res, next) {
+  try {
+    const openIdClientConfig = await getClientConfig();
+
+    const { pkce } = req.session;
+
+    if (!pkce || !pkce.code_verifier || !pkce.state) {
+      throw new Error('Login session expired or invalid. Please try logging in again.');
+    }
+
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const currentUrl = new URL(`${protocol}://${host}${req.originalUrl}`);
+
+    const tokenSet = await client.authorizationCodeGrant(openIdClientConfig, currentUrl, {
+      pkceCodeVerifier: pkce.code_verifier,
+      expectedState: pkce.state,
+    });
+
+    const { sub, department } = tokenSet.claims();
+
+    const userInfo = await client.fetchUserInfo(openIdClientConfig, tokenSet.access_token, sub);
+
+    const modifiedDepartment =
+      department === 'all'
+        ? [
+            { id: 'd1', label: 'd1' },
+            { id: 'd2', label: 'd2' },
+            { id: 'd3', label: 'd3' },
+          ]
+        : [{ id: department.split(' ').join('-').toLowerCase(), label: department }];
+
+    const userProfile = {
+      profile: {
+        ...userInfo,
+        idToken: tokenSet.id_token,
+        userGroups: modifiedDepartment,
       },
-      function (issuer, profile, context, idToken, accessToken, refreshToken, done) {
-        profile.accessToken = accessToken;
-        profile.idToken = idToken;
-        profile.refreshToken = refreshToken;
+    };
 
-        const decoded = jwt.decode(accessToken);
-        const departmentVal = decoded.employeeDepartment;
+    delete req.session.pkce;
 
-        // modifying the Groups array to object to have ids & label
-        // ["Groups 1", "Group Admin"] --> [{id: "groups1", label: "Groups1"}, {id: "groupAdmin", label: "Group Admin"}]
-        // const modifiedGroups = decoded?.groups?.map((element) => {
-        //   return {
-        //     label: element,
-        //     id: element.split(' ').join('-').toLowerCase(),
-        //   };
-        // });
-
-        // if dept value equals to "d1" change it to [{id: 'd1", label: "d1"}]
-        // if dept value equals to "all" change it to [{id: 'd1", label: "d1"}, {id: 'd2", label: "d2"}, {id: 'd3", label: "d3"}]
-        const modifiedDepartment =
-          departmentVal === 'all'
-            ? [
-                { id: 'd1', label: 'd1' },
-                { id: 'd2', label: 'd2' },
-                { id: 'd3', label: 'd3' },
-              ]
-            : [{ id: departmentVal.split(' ').join('-').toLowerCase(), label: departmentVal }];
-
-        profile.userGroups = modifiedDepartment;
-
-        console.dir(profile, { depth: null });
-
-        return done(null, { profile });
+    req.logIn(userProfile, (err) => {
+      if (err) {
+        return next(err);
       }
-    )
-  );
+      return res.redirect('/profile');
+    });
+  } catch (error) {
+    console.error('Authentication error:', error.message);
+    return res.status(500).send(`Authentication failed: ${error.message}`);
+  }
+}
 
-  passport.serializeUser(function (user, done) {
-    done(null, user);
-  });
-  passport.deserializeUser(function (obj, done) {
-    done(null, obj);
+export function logoutHandler(req, res) {
+  const id_token_hint = req.user?.profile?.idToken;
+
+  const logoutUrl = `${process.env.ISSUER}/v1/logout?id_token_hint=${id_token_hint}&post_logout_redirect_uri=${process.env.POST_LOGOUT_URL}`;
+
+  req.logout(() => {
+    req.session.destroy(() => {
+      res.redirect(logoutUrl);
+    });
   });
 }
 
-export default setupOIDC;
+export function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) return next();
+  res.redirect('/login');
+}
