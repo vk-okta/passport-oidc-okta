@@ -1,8 +1,28 @@
 import * as client from 'openid-client';
 import 'dotenv/config';
 
-export async function getClientConfig() {
+async function getClientConfig() {
   return await client.discovery(new URL(process.env.ISSUER), process.env.CLIENT_ID, process.env.CLIENT_SECRET);
+}
+
+function getCallbackUrlWithParams(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const currentUrl = new URL(`${protocol}://${host}${req.originalUrl}`);
+
+  return currentUrl;
+}
+
+function getModifiedDepartment(departmentVal) {
+  return departmentVal?.trim()
+    ? departmentVal === 'all'
+      ? [
+          { id: 'd1', label: 'd1' },
+          { id: 'd2', label: 'd2' },
+          { id: 'd3', label: 'd3' },
+        ]
+      : [{ id: departmentVal.split(' ').join('-').toLowerCase(), label: departmentVal.trim() }]
+    : [];
 }
 
 export async function loginHandler(req, res) {
@@ -13,7 +33,7 @@ export async function loginHandler(req, res) {
     const code_challenge = await client.calculatePKCECodeChallenge(code_verifier);
 
     const state = client.randomState();
-    req.session.pkce = { code_verifier, state };
+    req.session.pkceData = { code_verifier, state };
     req.session.save();
 
     const authUrl = client.buildAuthorizationUrl(openIdClientConfig, {
@@ -26,7 +46,7 @@ export async function loginHandler(req, res) {
 
     res.redirect(authUrl);
   } catch (error) {
-    res.status(500).send('OIDC client is not configured correctly.');
+    res.status(500).send('Something failed during the authorization request');
   }
 }
 
@@ -34,43 +54,37 @@ export async function callbackHandler(req, res, next) {
   try {
     const openIdClientConfig = await getClientConfig();
 
-    const { pkce } = req.session;
+    const { pkceData } = req.session;
 
-    if (!pkce || !pkce.code_verifier || !pkce.state) {
+    if (!pkceData || !pkceData.code_verifier || !pkceData.state) {
       throw new Error('Login session expired or invalid. Please try logging in again.');
     }
 
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const currentUrl = new URL(`${protocol}://${host}${req.originalUrl}`);
-
-    const tokenSet = await client.authorizationCodeGrant(openIdClientConfig, currentUrl, {
-      pkceCodeVerifier: pkce.code_verifier,
-      expectedState: pkce.state,
+    const tokenSet = await client.authorizationCodeGrant(openIdClientConfig, getCallbackUrlWithParams(req), {
+      pkceCodeVerifier: pkceData.code_verifier,
+      expectedState: pkceData.state,
     });
 
-    const { sub, department } = tokenSet.claims();
+    const { sub } = tokenSet.claims();
 
     const userInfo = await client.fetchUserInfo(openIdClientConfig, tokenSet.access_token, sub);
-
-    const modifiedDepartment =
-      department === 'all'
-        ? [
-            { id: 'd1', label: 'd1' },
-            { id: 'd2', label: 'd2' },
-            { id: 'd3', label: 'd3' },
-          ]
-        : [{ id: department.split(' ').join('-').toLowerCase(), label: department }];
+    const departmentVal = userInfo.department || '';
 
     const userProfile = {
       profile: {
         ...userInfo,
         idToken: tokenSet.id_token,
-        userGroups: modifiedDepartment,
+        userGroups: getModifiedDepartment(departmentVal),
       },
     };
 
-    delete req.session.pkce;
+    delete req.session.pkceData;
+
+    /*
+      When you call req.logIn(user):
+      It calls the passport.serializeUser() function to determine what gets stored in the session.
+      That data is then later used by passport.deserializeUser() to rebuild req.user on each request.
+    */
 
     req.logIn(userProfile, (err) => {
       if (err) {
@@ -79,7 +93,7 @@ export async function callbackHandler(req, res, next) {
       return res.redirect('/profile');
     });
   } catch (error) {
-    console.error('Authentication error:', error.message);
+    console.log(error);
     return res.status(500).send(`Authentication failed: ${error.message}`);
   }
 }
