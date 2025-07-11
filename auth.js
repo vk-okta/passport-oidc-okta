@@ -37,7 +37,7 @@ export async function loginHandler(req, res) {
     req.session.save();
 
     const authUrl = client.buildAuthorizationUrl(openIdClientConfig, {
-      scope: 'openid profile email offline_access',
+      scope: 'openid email profile offline_access',
       state,
       code_challenge,
       code_challenge_method: 'S256',
@@ -68,6 +68,7 @@ export async function callbackHandler(req, res, next) {
     const { sub } = tokenSet.claims();
 
     const userInfo = await client.fetchUserInfo(openIdClientConfig, tokenSet.access_token, sub);
+    console.log(userInfo)
     const departmentVal = userInfo.department || '';
 
     const userProfile = {
@@ -77,6 +78,8 @@ export async function callbackHandler(req, res, next) {
         userGroups: getModifiedDepartment(departmentVal),
       },
     };
+
+    console.log(tokenSet)
 
     delete req.session.pkceData;
 
